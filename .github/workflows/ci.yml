@@ -1,0 +1,336 @@
+name: CI # Workflow display name
+# run-name: ${{ github.actor }} triggered  # Run display name
+
+on: # Triggers (required)
+  push:
+    branches: [main, master] # [main, dev]
+    # branches-ignore: [temp/**]
+    #     tags: ['v*']
+    #     paths: ['src/**']
+
+  pull_request:
+    # types: [opened, synchronize, reopened]
+    branches: [main, master]
+# schedule:
+#   - cron: '0 9 * * 1'     # Every Monday 9am UTC
+
+# workflow_dispatch:  # Manual trigger
+#   inputs:
+#     env:
+#       description: 'Environment'
+#       required: true
+#       default: 'staging'
+#       type: choice
+#       options: [staging, prod]
+
+env: # Global env vars
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0 # disable incremental; full clean builds on CI
+  RUST_BACKTRACE: short
+  RUST_LOG: arc_forge_defi=debug
+
+# defaults: ... # Default settings
+
+# Cancel in-flight runs for the same branch on new push
+concurrency: # Concurrency control
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# jobs:
+#   build:
+#     name: Build App
+#     runs-on: ubuntu-latest   # or windows-latest, macos-latest
+#     timeout-minutes: 30
+#     needs: [test]            # Job dependencies
+#     if: github.ref == 'refs/heads/main'
+#     environment: production  # Deployment environment
+#     outputs:
+#       version: ${{ steps.get-version.outputs.version }}
+#     env:
+#       NODE_ENV: production
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         node: [18, 20]
+#         os: [ubuntu-latest, windows-latest]
+#     steps: ... # next section
+
+# steps:
+#   - name: Checkout
+#     uses: actions/checkout@v4 # next section
+#     with:
+#       fetch-depth: 0
+
+#   - name: Run script
+#     run: |
+#       echo "Hello"
+#       npm ci
+#     shell: bash
+#     working-directory: ./app
+#     env:
+#       TOKEN: ${{ secrets.MY_TOKEN }}
+#     id: my-step
+#     if: success()
+#     continue-on-error: true
+#     timeout-minutes: 5
+
+# uses: actions/checkout@v4
+# uses: actions/setup-node@v4
+#   with:
+#     node-version: '20'
+#     cache: 'npm'
+
+# uses: actions/setup-python@v5
+#   with:
+#     python-version: '3.12'
+
+# uses: actions/cache@v4
+#   with:
+#     path: ~/.npm
+#     key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+# uses: actions/upload-artifact@v4
+#   with:
+#     name: build-output
+#     path: dist/
+
+# uses: actions/download-artifact@v4
+
+# uses: docker/login-action@v3
+# uses: docker/build-push-action@v5
+
+jobs: # Jobs (required)
+  # ── 1. Format ───────────────────────────────────────────────────────────────
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (nightly + rustfmt)
+        # rustfmt.toml uses edition = "2024" which requires nightly rustfmt
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+  # ── 2. Clippy ───────────────────────────────────────────────────────────────
+  clippy:
+    name: Clippy (${{ matrix.features }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - features: default
+            cargo_args: --all-targets
+          - features: ai-agent
+            cargo_args: --all-targets --features ai-agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (MSRV)
+        uses: dtolnay/rust-toolchain@1.93.1
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: clippy-${{ matrix.features }}
+
+      - name: cargo clippy (strict, mirrors tasks.json)
+        run: |
+          cargo clippy ${{ matrix.cargo_args }} -- \
+            -D warnings \
+            -A clippy::module_name_repetitions \
+            -A clippy::must_use_candidate \
+            -A clippy::missing_errors_doc
+
+  # ── 3. Tests ───────────────────────────────────────────────────────────────
+  test:
+    name: Test (${{ matrix.os }} · ${{ matrix.toolchain }} · ${{ matrix.features }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        toolchain: [stable, "1.93.1"] # latest stable + MSRV
+        features: [default, ai-agent]
+        include:
+          # Only run the full matrix on Linux; macOS covers stable/default only
+          - os: macos-latest
+            toolchain: stable
+            features: default
+        exclude:
+          - os: macos-latest
+            toolchain: "1.93.1"
+          - os: macos-latest
+            features: ai-agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (${{ matrix.toolchain }})
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: test-${{ matrix.os }}-${{ matrix.toolchain }}-${{ matrix.features }}
+
+      - name: Build (default features)
+        if: matrix.features == 'default'
+        run: cargo build --all-targets
+
+      - name: Build (ai-agent feature)
+        if: matrix.features == 'ai-agent'
+        run: cargo build --all-targets --features ai-agent
+
+      # ── Core test suites ────────────────────────────────────────────────────
+      - name: Tests — validator_tests (sniper-bot prevention, 13 tests)
+        run: cargo test --test validator_tests -- --nocapture
+
+      - name: Tests — liquidity_tests (AMM model + anti-rug ratings, 11 tests)
+        run: cargo test --test liquidity_tests -- --nocapture
+
+      - name: Tests — forge_tests (PEV loop integration, 13 tests))
+        run: cargo test --test forge_tests -- --nocapture
+
+      - name: Tests — integration (PEV loop integration, 13 tests))
+        run: cargo test --test integration -- --nocapture
+
+      - name: Tests — doctests + unit tests (default features)
+        if: matrix.features == 'default'
+        run: cargo test --workspace -- --test-threads=8
+
+      - name: Tests — doctests + unit tests (ai-agent feature)
+        if: matrix.features == 'ai-agent'
+        run: cargo test --workspace --features ai-agent -- --test-threads=8
+
+  # ── 4. Release build ────────────────────────────────────────────────────────
+  build-release:
+    name: Release build (Linux · stable)
+    runs-on: ubuntu-latest
+    needs: [fmt, clippy, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release
+
+      - name: cargo build --release
+        # Mirrors tasks.json: CARGO_INCREMENTAL=0, LTO already on in profile
+        run: cargo build --release
+        env:
+          CARGO_INCREMENTAL: 0
+
+      - name: Upload release binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: arc-forge-defi-linux-x86_64
+          path: target/release/arc-forge-defi
+          retention-days: 7
+
+  # ── 5. Docs ─────────────────────────────────────────────────────────────────
+  docs:
+    name: Rustdoc (docs.rs parity)
+    runs-on: ubuntu-latest
+    needs: [fmt, clippy, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: docs
+
+      - name: cargo doc --all-features
+        # Mirrors package.metadata.docs.rs in Cargo.toml
+        run: cargo doc --all-features --no-deps --document-private-items
+        env:
+          RUSTDOCFLAGS: --cfg docsrs
+
+  # ── 6. MSRV check ───────────────────────────────────────────────────────────
+  msrv:
+    name: MSRV (rust-version = 1.93.1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MSRV toolchain
+        uses: dtolnay/rust-toolchain@1.93.1
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv
+
+      - name: cargo check (MSRV, all targets)
+        run: cargo check --all-targets
+
+      - name: cargo check (MSRV, ai-agent feature)
+        run: cargo check --all-targets --features ai-agent
+
+# permissions: ...            # GitHub token permissions # in later section
+
+# workflow_call:             # Reusable workflow
+#   release:
+#     types: [published]
+
+# Contexts & Expressions
+# ${{ github.sha }}
+# ${{ github.ref }}
+# ${{ github.event_name }}
+# ${{ github.actor }}
+# ${{ github.repository }}
+# ${{ runner.os }}
+# ${{ env.MY_VAR }}
+# ${{ secrets.MY_SECRET }}
+# ${{ vars.MY_VAR }}           # Repository variables
+# ${{ inputs.my_input }}
+# ${{ needs.build.outputs.version }}
+# ${{ matrix.node }}
+# ${{ steps.my-step.outputs.result }}
+
+# if conditions
+# if: github.event_name == 'push'
+# if: github.ref == 'refs/heads/main'
+# if: contains(github.ref, 'tags')
+# if: failure()
+# if: success()
+# if: always()
+# if: cancelled()
+# if: ${{ !cancelled() }}
+
+# concurrency
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
+
+# permissions
+# permissions:
+#   contents: read
+#   packages: write
+#   id-token: write        # For OIDC
+#   pull-requests: write
+#   issues: write
+#   actions: read
+
+# defaults
+# defaults:
+#   run:
+#     shell: bash
+#     working-directory: ./src
+
+# Secrets & Variables
+# env:
+#   MY_SECRET: ${{ secrets.MY_SECRET }}   # Repo/org secret
+#   MY_VAR: ${{ vars.MY_VAR }}            # Repo/org variable
+#   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Auto-provided

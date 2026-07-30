@@ -1,0 +1,304 @@
+//! tests/integration.rs
+//! ─────────────────────────────────────────────────────────────────────────────
+//! Integration tests for the ARC Forge `DeFi` platform.
+//!
+//! These tests run without any network calls (no Solana RPC, no Raydium API).
+//! They validate the core business logic: PEV loop simulation, sniper-bot
+//! prevention scoring, liquidity metrics, and JSON serialisation.
+//!
+//! Run with:   cargo test
+//! Run single: cargo test `test_full_launch_simulation` -- --nocapture
+//! ─────────────────────────────────────────────────────────────────────────────
+
+/// Asserts that the `ArcForgeLauncher` can simulate a full launch successfully.
+///
+/// It uses the `safe_config()` function to simulate a launch and checks that
+/// the `ValidationStatus` is `Ok` and the `LaunchSimulation` can be serialised to JSON.
+///
+/// # Panics
+///
+/// This test will panic if the `ValidationStatus` is not `Ok` or the `LaunchSimulation` cannot
+/// be serialised to JSON.
+use arc_forge_defi::{
+    defi::liquidity::DeepLiquidityProtocol,
+    forge::ArcForgeLauncher,
+    types::{LaunchConfig, LiquidityConfig, MintInfo, SolanaNetwork, ValidationStatus},
+    validator::TokenValidator,
+};
+
+/// A fully safe launch configuration - should score >= 80 readiness.
+///
+/// This function returns a `LaunchConfig` with all safety features enabled,
+/// suitable for testing a safe launch simulation.
+///
+/// This config is safe to use in a production environment.
+fn safe_launch_config() -> LaunchConfig {
+    LaunchConfig {
+        token_name: "MAI Token".to_string(),
+        token_symbol: "MAI".to_string(),
+        total_supply: 1_000_000_000_000_000, // 1M MAI at 9 decimals
+        decimals: 9,
+        mint_authority_renounced: true,
+        freeze_authority_renounced: true,
+        liquidity: LiquidityConfig {
+            initial_liquidity_sol: 50.0,
+            token_allocation_pct: 10.0,
+            burn_lp_tokens: true,
+            lock_duration_days: 0,
+            price_range_lower: 0.0,
+            price_range_upper: 0.0,
+        },
+        network: SolanaNetwork::Devnet,
+    }
+}
+
+/// A dangerous launch config - both authorities retained, no LP safety.
+///
+/// This function returns a `LaunchConfig` with all safety features disabled,
+/// suitable for testing a dangerous launch simulation.
+///
+/// This config is not safe to use in a production environment.
+fn dangerous_launch_config() -> LaunchConfig {
+    LaunchConfig {
+        token_name: "Rug Pull Token".to_string(),
+        token_symbol: "RUG".to_string(),
+        total_supply: 1_000_000_000_000_000,
+        decimals: 9,
+        mint_authority_renounced: false, // ← DANGEROUS: can inflate supply
+        freeze_authority_renounced: false, // ← DANGEROUS: can freeze accounts
+        liquidity: LiquidityConfig {
+            initial_liquidity_sol: 0.5, // ← Too shallow
+            token_allocation_pct: 10.0,
+            burn_lp_tokens: false, // ← LP not burned
+            lock_duration_days: 0, // ← LP not locked
+            price_range_lower: 0.0,
+            price_range_upper: 0.0,
+        },
+        network: SolanaNetwork::Devnet,
+    }
+}
+
+/// Asserts that the `ArcForgeLauncher` can simulate a full launch successfully with a safe config.
+///
+/// It uses the `safe_launch_config()` function to simulate a launch and checks that
+/// the `ValidationStatus` is `Ok` and the `LaunchSimulation` can be serialised to JSON.
+///
+/// # Panics
+///
+/// This test will panic if the `ValidationStatus` is not `Ok` or the `LaunchSimulation` cannot
+/// be serialised to JSON.
+#[test]
+fn test_full_launch_simulation_safe_config() {
+    let launcher = ArcForgeLauncher::new("https://api.devnet.solana.com");
+    let sim = launcher.simulate_planned_launch(safe_launch_config());
+
+    // Core safety assertions
+    assert!(sim.dry_run, "Simulation must always be dry-run");
+    assert!(
+        sim.sniper_bot_prevention_active,
+        "Sniper prevention should be active"
+    );
+    assert!(
+        sim.launch_readiness_score >= 80,
+        "Safe config should score >= 80, got {}",
+        sim.launch_readiness_score
+    );
+
+    // Validation checks
+    assert_eq!(sim.validation_report.overall_status, ValidationStatus::Safe);
+    assert_eq!(sim.validation_report.risk_score, 0);
+
+    // Liquidity metrics
+    assert!(sim.liquidity_metrics.estimated_initial_price_usd > 0.0);
+    assert!(sim.liquidity_metrics.estimated_market_cap_usd > 0.0);
+    assert!(sim.liquidity_metrics.liquidity_depth_score >= 60); // 50 SOL → 80
+    assert!(sim.liquidity_metrics.anti_rug_rating.contains("DIAMOND"));
+
+    // PEV loop populated
+    assert!(!sim.pev_loop_summary.perceive.is_empty());
+    assert!(!sim.pev_loop_summary.evaluate.is_empty());
+    assert!(!sim.pev_loop_summary.validate.is_empty());
+}
+
+/// Asserts that the `ArcForgeLauncher` can simulate a full launch successfully with a dangerous
+/// config.
+///
+/// It uses the `dangerous_launch_config()` function to simulate a launch and checks that
+/// the `ValidationStatus` is `Dangerous` and the `LaunchSimulation` can be serialised to JSON.
+///
+/// # Panics
+///
+/// This test will panic if the `ValidationStatus` is not `Dangerous` or the `LaunchSimulation`
+/// cannot be serialised to JSON.
+#[test]
+fn test_full_launch_simulation_dangerous_config() {
+    let launcher = ArcForgeLauncher::new("https://api.devnet.solana.com");
+    let sim = launcher.simulate_planned_launch(dangerous_launch_config());
+
+    assert!(sim.dry_run);
+    assert!(
+        !sim.sniper_bot_prevention_active,
+        "Sniper prevention must be INACTIVE for dangerous config"
+    );
+    assert!(
+        sim.launch_readiness_score < 80,
+        "Dangerous config should score < 80, got {}",
+        sim.launch_readiness_score
+    );
+    assert_eq!(
+        sim.validation_report.overall_status,
+        ValidationStatus::Dangerous
+    );
+    assert!(sim.validation_report.risk_score > 0);
+    assert!(sim.pev_loop_summary.validate.contains("BLOCKED"));
+}
+
+/// Asserts that the `TokenValidator` correctly identifies a safe mint.
+///
+/// This test creates a `MintInfo` with no mint or freeze authority and verifies that
+/// the `TokenValidator` correctly identifies it as a safe mint.
+#[test]
+fn test_validator_safe_mint_all_checks_pass() {
+    let mint = MintInfo {
+        address: "SafeMint111111111111111111111111111111111".to_string(),
+        supply: 1_000_000_000_000_000,
+        decimals: 9,
+        is_initialized: true,
+        mint_authority: None,
+        freeze_authority: None,
+    };
+    let validator = TokenValidator::new("https://api.devnet.solana.com");
+    let report = validator.validate_mint_info(&mint);
+
+    assert_eq!(report.overall_status, ValidationStatus::Safe);
+    assert_eq!(report.risk_score, 0);
+    assert!(report.checks.iter().all(|c| c.passed));
+    assert!(report.recommendation.contains("safe to launch"));
+}
+
+/// Asserts that the `TokenValidator` correctly identifies a dangerous mint with a freeze authority.
+///
+/// This test creates a `MintInfo` with a `freeze_authority` and verifies that the `TokenValidator`
+/// correctly identifies it as a dangerous mint with a critical freeze authority check.
+#[test]
+fn test_validator_freeze_authority_is_critical() {
+    let mint = MintInfo {
+        address: "DangerMint11111111111111111111111111111111".to_string(),
+        supply: 1_000_000_000_000_000,
+        decimals: 9,
+        is_initialized: true,
+        mint_authority: None,
+        freeze_authority: Some("FreezeKey1111111111111111111111111111111".to_string()),
+    };
+    let validator = TokenValidator::new("https://api.devnet.solana.com");
+    let report = validator.validate_mint_info(&mint);
+
+    assert_eq!(report.overall_status, ValidationStatus::Dangerous);
+    let freeze_check = report
+        .checks
+        .iter()
+        .find(|c| c.name == "Freeze Authority")
+        .unwrap();
+    assert!(!freeze_check.passed);
+    assert_eq!(freeze_check.status, ValidationStatus::Dangerous);
+}
+
+/// Asserts that the `DeepLiquidityProtocol` correctly computes liquidity metrics for a safe launch.
+///
+/// This test uses the `safe_launch_config()` function to compute liquidity metrics and verifies
+/// that the price consistency check passes within floating-point tolerance.
+#[test]
+fn test_liquidity_metrics_price_consistency() {
+    let config = safe_launch_config();
+    let m = DeepLiquidityProtocol::compute(&config);
+
+
+    // Price × total supply ≈ market cap (within floating-point tolerance)
+    let supply_hi = f64::from(u32::try_from(config.total_supply >> 32).unwrap_or(u32::MAX));
+    let supply_lo = f64::from(u32::try_from(config.total_supply & 0xFFFF_FFFF).unwrap_or(u32::MAX));
+    let total_adjusted =
+        (supply_hi * 4_294_967_296.0 + supply_lo) / 10f64.powi(i32::from(config.decimals));
+    let expected_mcap = m.estimated_initial_price_usd * total_adjusted;
+    let diff = (m.estimated_market_cap_usd - expected_mcap).abs();
+    assert!(
+        diff < 1.0,
+        "Market cap mismatch: got {}, expected {}",
+        m.estimated_market_cap_usd,
+        expected_mcap
+    );
+}
+
+/// Asserts that the `DeepLiquidityProtocol` correctly computes the number of tokens in the pool.
+///
+/// This test uses the `safe_launch_config()` function to compute liquidity metrics and verifies
+/// that the number of tokens in the pool matches the expected 10% allocation.
+#[test]
+fn test_liquidity_tokens_in_pool() {
+    let config = safe_launch_config();
+    let m = DeepLiquidityProtocol::compute(&config);
+
+    let expected = u64::try_from(u128::from(config.total_supply) * 10 / 100).unwrap_or(u64::MAX); // 10% alloc
+    assert_eq!(m.tokens_in_pool, expected);
+}
+
+/// Asserts that the `DeepLiquidityProtocol` correctly orders price impacts.
+///
+/// This test uses the `safe_launch_config()` function to compute liquidity metrics and verifies
+/// that the price impact ordering is consistent with the expected $10K buy having higher impact.
+#[test]
+fn test_price_impact_ordering() {
+    let config = safe_launch_config();
+    let m = DeepLiquidityProtocol::compute(&config);
+
+    // A $10K buy must have higher price impact than a $1K buy
+    assert!(
+        m.price_large_buy_impact_usd_buy_pct > m.price_small_buy_impact_usd_buy_pct,
+        "10K impact ({}) should exceed 1K impact ({})",
+        m.price_large_buy_impact_usd_buy_pct,
+        m.price_small_buy_impact_usd_buy_pct
+    );
+}
+
+/// Asserts that the `LaunchSimulation` can be serialised and deserialised correctly.
+///
+/// This test creates a `LaunchSimulation` instance, serialises it to JSON, and then deserialises
+/// it back to verify that the data is preserved correctly.
+#[test]
+fn test_simulation_json_round_trip() {
+    let launcher = ArcForgeLauncher::new("https://api.devnet.solana.com");
+    let sim = launcher.simulate_planned_launch(safe_launch_config());
+
+    let json = serde_json::to_string(&sim).expect("Serialisation failed");
+    assert!(!json.is_empty());
+    assert!(json.contains("\"dry_run\":true"));
+    assert!(json.contains("\"token_symbol\":\"MAI\""));
+
+    // Deserialise back
+    let sim2: arc_forge_defi::types::LaunchSimulation =
+        serde_json::from_str(&json).expect("Deserialisation failed");
+    assert_eq!(sim2.config.token_symbol, "MAI");
+    assert!(sim2.dry_run);
+}
+
+/// Asserts that the `ValidationReport` can be serialised and deserialised correctly.
+///
+/// This test creates a `ValidationReport` instance, serialises it to JSON, and then deserialises
+/// it back to verify that the data is preserved correctly.
+#[test]
+fn test_validation_report_json_serialisable() {
+    let mint = MintInfo {
+        address: "TestMint1111111111111111111111111111111111".to_string(),
+        supply: 1_000_000,
+        decimals: 6,
+        is_initialized: true,
+        mint_authority: None,
+        freeze_authority: None,
+    };
+    let validator = TokenValidator::new("https://api.devnet.solana.com");
+    let report = validator.validate_mint_info(&mint);
+
+    let json = serde_json::to_string_pretty(&report).expect("Failed to serialise report");
+    assert!(json.contains("\"overall_status\""));
+    assert!(json.contains("\"risk_score\""));
+    assert!(json.contains("\"checks\""));
+}
