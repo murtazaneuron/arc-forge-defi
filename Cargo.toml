@@ -1,12 +1,12 @@
 [package]
 name        = "arc-forge-defi"
-version     = "0.1.1"
+version     = "0.1.2"
 edition     = "2024"
 rust-version = "1.85.0"                    # Rust 2024 minimum per process doc
 authors     = ["Murtaza Ali Imtiaz <very.kool.king@gmail.com>"]
 description = "ARC Forge DeFi platform - Solana token launch with sniper-bot prevention and deep initial liquidity, powered by Rig (ARC) AI agents"
 license     = "MIT OR Apache-2.0"          # valid SPDX; AND/OR is WRONG
-repository  = "https://github.com/murtazaai/arc-forge-defi"
+repository  = "https://github.com/murtazaneuron/arc-forge-defi"
 keywords    = ["solana", "defi", "rig-arc", "sniper-bot", "hft"]
 categories  = ["cryptography::cryptocurrencies"]
 readme      = "README.md"

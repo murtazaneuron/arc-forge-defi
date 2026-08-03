@@ -5,14 +5,14 @@ and deep initial liquidity, powered by [Rig (ARC)](https://rig.rs) AI agents.
 
 [![Crates.io](https://img.shields.io/crates/v/arc-forge-defi.svg)](https://crates.io/crates/arc-forge-defi)
 [![Docs.rs](https://docs.rs/arc-forge-defi/badge.svg)](https://docs.rs/arc-forge-defi)
-[![CI](https://github.com/murtazaai/arc-forge-defi/actions/workflows/ci.yml/badge.svg)](https://github.com/murtazaai/arc-forge-defi/actions/workflows/ci.yml)
+[![CI](https://github.com/murtazaneuron/arc-forge-defi/actions/workflows/ci.yml/badge.svg)](https://github.com/murtazaneuron/arc-forge-defi/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/Rust-1.85.0+-orange)](https://www.rust-lang.org)
 [![Edition](https://img.shields.io/badge/Edition-2024-blue)](https://doc.rust-lang.org/edition-guide/)
 [![rig-core](https://img.shields.io/badge/rig--core-0.37-purple)](https://rig.rs)
 [![Solana](https://img.shields.io/badge/Solana-Devnet%2FMainnet-9945FF)](https://solana.com)
 [![License](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue)](LICENSE-MIT)
 
-> Built by **[Murtaza Ali Imtiaz](https://github.com/murtazaai)** · Technology Lead · **Polar Bear (🍨)** · July 2019 – Present
+> Built by **[Murtaza Ali Imtiaz](https://github.com/murtazaneuron)** · Technology Lead · **Polar Bear (🍨)** · July 2019 – Present
 
 ---
 
@@ -123,7 +123,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 ## Quick Start
 
 ```text
-git clone https://github.com/murtazaai/arc-forge-defi
+git clone https://github.com/murtazaneuron/arc-forge-defi
 cd arc-forge-defi
 cp .env.example .env           # add ANTHROPIC_API_KEY if using --features ai-agent
 cargo build --release
@@ -338,10 +338,10 @@ tokio-native, zero Python.
 
 | Repo | Details |
 |------|---------|
-| [polar-bear-rig-hft](https://github.com/murtazaai/polar-bear-rig-hft) | rig-core HFT + PEV loop |
-| [polar-bear-rig-onchain](https://github.com/murtazaai/polar-bear-rig-onchain) | rig-onchain-kit + SignerContext |
-| [hft-crypto](https://github.com/murtazaai/hft-crypto) | ECDSA/Ed25519 + 7-exchange auth |
-| **[arc-forge-defi](https://github.com/murtazaai/arc-forge-defi)** | **ARC Forge + sniper-bot prevention ← this repo** |
+| [polar-bear-rig-hft](https://github.com/murtazaneuron/polar-bear-rig-hft) | rig-core HFT + PEV loop |
+| [polar-bear-rig-onchain](https://github.com/murtazaneuron/polar-bear-rig-onchain) | rig-onchain-kit + SignerContext |
+| [hft-crypto](https://github.com/murtazaneuron/hft-crypto) | ECDSA/Ed25519 + 7-exchange auth |
+| **[arc-forge-defi](https://github.com/murtazaneuron/arc-forge-defi)** | **ARC Forge + sniper-bot prevention ← this repo** |
 
 ---
 
@@ -374,6 +374,6 @@ Licensed under:
 
 **Murtaza Ali Imtiaz** · Technology Lead · **Polar Bear (🍨)** · (July 2019 – Present)
 
-- GitHub: [@murtazaai](https://github.com/murtazaai)
+- GitHub: [@murtazaneuron](https://github.com/murtazaneuron)
 - LinkedIn: [linkedin.com/in/murtazai](https://linkedin.com/in/murtazai)
 - Portfolio: [murtazai.com](https://murtazai.com)

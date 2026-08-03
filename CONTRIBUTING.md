@@ -19,7 +19,7 @@
 ### Setup
 
 ```text
-git clone https://github.com/murtazaai/arc-forge-defi
+git clone https://github.com/murtazaneuron/arc-forge-defi
 cd arc-forge-defi
 cp .env.example .env
 # Edit .env: set ANTHROPIC_API_KEY=sk-ant-... (only needed for ai-agent feature)

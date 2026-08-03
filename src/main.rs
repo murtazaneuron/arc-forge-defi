@@ -41,7 +41,7 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
     version,
     about = "ARC Forge DeFi Platform - Solana token launch with sniper-bot prevention\n\
              and deep initial liquidity, powered by Rig (ARC) AI agents.\n\n\
-             https://github.com/murtazaai/arc-forge-defi",
+             https://github.com/murtazaneuron/arc-forge-defi",
     long_about = None,
 )]
 /// CLI for the ARC Forge `DeFi` platform.
