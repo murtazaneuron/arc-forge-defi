@@ -338,8 +338,8 @@ tokio-native, zero Python.
 
 | Repo | Details |
 |------|---------|
-| [polar-bear-rig-hft](https://github.com/murtazaneuron/polar-bear-rig-hft) | rig-core HFT + PEV loop |
-| [polar-bear-rig-onchain](https://github.com/murtazaneuron/polar-bear-rig-onchain) | rig-onchain-kit + SignerContext |
+| [hft-core](https://github.com/murtazaneuron/hft-core) | rig-core HFT + PEV loop |
+| [hft-onchain](https://github.com/murtazaneuron/hft-onchain) | rig-onchain-kit + SignerContext |
 | [hft-crypto](https://github.com/murtazaneuron/hft-crypto) | ECDSA/Ed25519 + 7-exchange auth |
 | **[arc-forge-defi](https://github.com/murtazaneuron/arc-forge-defi)** | **ARC Forge + sniper-bot prevention ← this repo** |
 
@@ -361,7 +361,7 @@ tokio-native, zero Python.
 ## License
 
 Proprietary - © 2026 Murtaza Ali Imtiaz / mAI (🧠)  
-See [LICENSE-PBS](LICENSE-PBS) for permitted use.
+See [LICENSE-MAI](LICENSE-MAI) for permitted use.
 
 Licensed under:
 
