@@ -1,6 +1,6 @@
 # Contributing to arc-forge-defi
 
-> **Polar Bear (🍨)** · Technology Lead: Murtaza Ali Imtiaz
+> **mAI (🧠)** · Technology Lead: Murtaza Ali Imtiaz
 > This repository is published under a restricted proprietary licence for
 > portfolio and reference purposes.  See [LICENSE-PBS](./LICENSE-PBS) for permitted use.
 

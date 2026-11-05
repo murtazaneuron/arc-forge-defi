@@ -12,7 +12,7 @@ and deep initial liquidity, powered by [Rig (ARC)](https://rig.rs) AI agents.
 [![Solana](https://img.shields.io/badge/Solana-Devnet%2FMainnet-9945FF)](https://solana.com)
 [![License](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue)](LICENSE-MIT)
 
-> Built by **[Murtaza Ali Imtiaz](https://github.com/murtazaneuron)** · Technology Lead · **Polar Bear (🍨)** · July 2019 – Present
+> Built by **[Murtaza Ali Imtiaz](https://github.com/murtazaneuron)** · Technology Lead · **mAI (🧠)** · July 2019 – Present
 
 ---
 
@@ -305,7 +305,7 @@ on Solana."*
 
 ### STAR
 
-**Situation**: Polar Bear (🍨)' DeFi clients needed token launch infrastructure
+**Situation**: mAI (🧠)' DeFi clients needed token launch infrastructure
 protecting buyers from sniper bots, rug pulls, and unfair initial liquidity - the
 three most common Solana launch exploits.
 
@@ -360,7 +360,7 @@ tokio-native, zero Python.
 
 ## License
 
-Proprietary - © 2026 Murtaza Ali Imtiaz / Polar Bear (🍨)  
+Proprietary - © 2026 Murtaza Ali Imtiaz / mAI (🧠)  
 See [LICENSE-PBS](LICENSE-PBS) for permitted use.
 
 Licensed under:
@@ -372,7 +372,7 @@ Licensed under:
 
 ## Author
 
-**Murtaza Ali Imtiaz** · Technology Lead · **Polar Bear (🍨)** · (July 2019 – Present)
+**Murtaza Ali Imtiaz** · Technology Lead · **mAI (🧠)** · (July 2019 – Present)
 
 - GitHub: [@murtazaneuron](https://github.com/murtazaneuron)
 - LinkedIn: [linkedin.com/in/murtazai](https://linkedin.com/in/murtazai)
